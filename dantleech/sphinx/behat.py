@@ -25,11 +25,8 @@ from sphinx.util.osutil import os_path, ensuredir
 
 def setup(app):
     app.add_builder(BehatBuilder)
-    app.add_node(GivenNode, behat=(visit_behat, depart_behat), html=(visit_html, depart_html))
-    app.add_node(ThenNode, behat=(visit_behat, depart_behat), html=(visit_html, depart_html))
-    app.add_role('given', given_role)
-    app.add_role('you', given_role)
-    app.add_role('then', then_role)
+    app.add_node(BehatNode, behat=(visit_behat, depart_behat), html=(visit_html, depart_html))
+    app.add_role('behat', behat_role)
 
 class BehatBuilder(Builder):
     """
@@ -645,16 +642,10 @@ class BehatTranslator(nodes.NodeVisitor):
     def depart_comment(self, node):
         pass
 
-    def visit_ThenNode(self, node):
+    def visit_BehatNode(self, node):
         return visit_behat(self, node)
 
-    def depart_ThenNode(self, node):
-        pass
-
-    def visit_GivenNode(self, node):
-        return visit_behat(self, node)
-
-    def depart_GivenNode(self, node):
+    def depart_BehatNode(self, node):
         pass
 
     def scenario_append(self, text):
@@ -664,32 +655,20 @@ class BehatTranslator(nodes.NodeVisitor):
         current_scenario = self.scenarios[self.current_section_title]
         current_scenario.append(text)
 
-def given_role(name, rawtext, text, lineno, inliner, option={}, context=[]):
-    return [GivenNode(text)], []
-
-def then_role(name, rawtext, text, lineno, inliner, option={}, context=[]):
-    return [ThenNode(text)], []
+def behat_role(name, rawtext, text, lineno, inliner, option={}, context=[]):
+    return [BehatNode(text)], []
 
 class BehatNode(nodes.Text):
     """
-    Parent node for behat nodes
-    """
-    pass
-
-class GivenNode(nodes.Text):
-    """
-    "Given" node
-    """
-    pass
-
-class ThenNode(nodes.Text):
-    """
-    "Then" node
+    Node for behat nodes
     """
     pass
 
 def visit_behat(self, node):
-    sentence = '        Given ' + node.astext()
+    """
+    Visit a behat node (e.g. Given, Then)
+    """
+    sentence = '        ' + node.astext()
     literal_block = None
     siblings = node.traverse(siblings=True, ascend=True)
 
@@ -704,7 +683,7 @@ def visit_behat(self, node):
 
             if following.__class__.__name__ == 'literal_block':
                 if 'language' in following:
-                    sentence += ' (in "' + following['language'] + '")'
+                    sentence += ' (in "' + following['language'] + '"):'
 
                 block_lines = following.astext().split('\n')
                 block_lines.insert(0, '"""')
@@ -721,7 +700,6 @@ def visit_behat(self, node):
 
 def depart_behat(self, node):
     pass
-
 
 def visit_html(self, node):
     return None
