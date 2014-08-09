@@ -25,7 +25,10 @@ from sphinx.util.osutil import os_path, ensuredir
 
 def setup(app):
     app.add_builder(BehatBuilder)
+    app.add_node(GivenNode, behat=(visit_behat, depart_behat), html=(visit_html, depart_html))
+    app.add_node(ThenNode, behat=(visit_behat, depart_behat), html=(visit_html, depart_html))
     app.add_role('given', given_role)
+    app.add_role('you', given_role)
     app.add_role('then', then_role)
 
 class BehatBuilder(Builder):
@@ -104,53 +107,8 @@ class BehatTranslator(nodes.NodeVisitor):
         nodes.NodeVisitor.__init__(self, document)
         self.builder = builder
 
-        self.states = [[]]
-        self.stateindent = [0]
-        self.list_counter = []
-        self.sectionlevel = 0
-        self.lineblocklevel = 0
-        self.table = None
-
-    def add_text(self, text):
-        self.states[-1].append((-1, text))
-    def new_state(self, indent=0):
-        self.states.append([])
-        self.stateindent.append(indent)
-    def end_state(self, wrap=True, end=[''], first=None):
-        content = self.states.pop()
-        maxindent = sum(self.stateindent)
-        indent = self.stateindent.pop()
-        result = []
-        toformat = []
-        def do_format():
-            if not toformat:
-                return
-            if wrap:
-                res = my_wrap(''.join(toformat), width=MAXWIDTH-maxindent)
-            else:
-                res = ''.join(toformat).splitlines()
-            if end:
-                res += end
-            result.append((indent, res))
-        for itemindent, item in content:
-            if itemindent == -1:
-                toformat.append(item)
-            else:
-                do_format()
-                result.append((indent + itemindent, item))
-                toformat = []
-        do_format()
-        if first is not None and result:
-            itemindent, item = result[0]
-            result_rest, result = result[1:], []
-            if item:
-                toformat = [first + ' '.join(item)]
-                do_format()  #re-create `result` from `toformat`
-                _dummy, new_item = result[0]
-                result.insert(0, (itemindent - indent, [new_item[0]]))
-                result[1] = (itemindent, new_item[1:])
-                result.extend(result_rest)
-        self.states[-1].extend(result)
+        self.scenarios = {}
+        self.current_section_title = None
 
     def visit_document(self, node):
         self.lines = [];
@@ -159,13 +117,27 @@ class BehatTranslator(nodes.NodeVisitor):
         pass
 
     def depart_document(self, node):
-        self.body = '\n'.join(self.lines)
+        if len(self.scenarios) > 0:
+            for scenario_title in self.scenarios:
+                lines = self.scenarios[scenario_title]
+
+                if len(lines) > 0:
+                    self.lines.append('')
+                    self.lines.append('    Scenario: ' + scenario_title.astext())
+                    for line in lines:
+                        self.lines.append(line)
+
+            self.body = '\n'.join(self.lines)
+            self.body += '\n'
         pass
 
     def visit_highlightlang(self, node):
         pass
 
     def visit_section(self, node):
+        title = node[0]
+        self.scenarios[title] = []
+        self.current_section_title = title
         pass
 
     def depart_section(self, node):
@@ -192,8 +164,6 @@ class BehatTranslator(nodes.NodeVisitor):
         pass
 
     def visit_title(self, node):
-        self.lines.append('')
-        self.lines.append(''.join(['    ', 'Scenario: ', node.astext()]))
         return
 
     def depart_title(self, node):
@@ -675,28 +645,36 @@ class BehatTranslator(nodes.NodeVisitor):
     def depart_comment(self, node):
         pass
 
-    def visit_GivenNode(self, node):
-        self.lines.append(''.join(['        Given ', node.astext()]))
-        pass
-
-    def depart_GivenNode(self, node):
-        pass
-
     def visit_ThenNode(self, node):
-        self.lines.append(''.join(['        Then ', node.astext()]))
-        pass
+        return visit_behat(self, node)
 
     def depart_ThenNode(self, node):
         pass
 
-    def unknown_visit(self, node):
-        raise NotImplementedError('Unknown node: ' + node.__class__.__name__)
+    def visit_GivenNode(self, node):
+        return visit_behat(self, node)
+
+    def depart_GivenNode(self, node):
+        pass
+
+    def scenario_append(self, text):
+        if (None == self.current_section_title):
+            raise Exception('Cannot add behat roles outside of a section')
+
+        current_scenario = self.scenarios[self.current_section_title]
+        current_scenario.append(text)
 
 def given_role(name, rawtext, text, lineno, inliner, option={}, context=[]):
     return [GivenNode(text)], []
 
 def then_role(name, rawtext, text, lineno, inliner, option={}, context=[]):
     return [ThenNode(text)], []
+
+class BehatNode(nodes.Text):
+    """
+    Parent node for behat nodes
+    """
+    pass
 
 class GivenNode(nodes.Text):
     """
@@ -709,3 +687,44 @@ class ThenNode(nodes.Text):
     "Then" node
     """
     pass
+
+def visit_behat(self, node):
+    sentence = '        Given ' + node.astext()
+    literal_block = None
+    siblings = node.traverse(siblings=True, ascend=True)
+
+    index = 1
+
+    if 0 <= index < len(siblings):
+        if siblings[index].astext() == ':':
+            index += 1
+
+        if 0 <= index < len(siblings):
+            following = siblings[index]
+
+            if following.__class__.__name__ == 'literal_block':
+                if 'language' in following:
+                    sentence += ' (in "' + following['language'] + '")'
+
+                block_lines = following.astext().split('\n')
+                block_lines.insert(0, '"""')
+                block_lines.append('"""')
+                block_lines = map(lambda x: '        ' + x, block_lines )
+                literal_block = '\n'.join(block_lines)
+
+    self.scenario_append(sentence)
+
+    if (literal_block):
+        self.scenario_append(literal_block)
+
+    pass
+
+def depart_behat(self, node):
+    pass
+
+
+def visit_html(self, node):
+    return None
+
+def depart_html(self, node):
+    return None
