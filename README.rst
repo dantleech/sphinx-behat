@@ -1,8 +1,28 @@
 Behat Sphinx Extension
 ======================
 
-This POC Sphinx Extension aims to add support for generating behat `.feature`
+This WIP Sphinx Extension adds support for generating behat `.feature`
 files from restructured text documentation.
+
+Basically each section of the documentation is interpreted as a `Scenario` and
+the extension adds a role `:behat:` which enables you to add Behat scenario
+parts (e.g. `Given x`, `Then y`).
+
+Some things to note:
+
+- **Code modification instructions and diffs**: Lots of instructions involve
+  code modification (e.g. add this line to your configuration file). It is
+  tricky (but not impossible) to present this information in a way which is
+  100% acceptable for humans. The compromise is to use the `diff` format in
+  the documenation (this is more precise anyway). But understandably prople
+  won't think this is ideal - but what is more ideal?  That the code works or
+  that it looks nice?
+
+- **Dependencies**: Lots of documentation is made up of a series, with each
+  document building on the result of the previous article. This needs to be
+  implemented somehow.
+
+- **Work in progrss**: This is still a work in progres.
 
 Currently, given you have the following file::
 
