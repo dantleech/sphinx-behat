@@ -35,6 +35,7 @@ class BehatBuilder(Builder):
     name = 'behat'
 
     def init(self):
+        self.out_suffix = '.feature'
         pass
 
     def get_outdated_docs(self):
@@ -395,6 +396,18 @@ class BehatTranslator(nodes.NodeVisitor):
     def depart_term(self, node):
         pass
 
+    def visit_note(self, node):
+        pass
+
+    def depart_note(self, node):
+        pass
+
+    def visit_colspec(self, node):
+        pass
+
+    def depart_colspec(self, node):
+        pass
+
     def visit_termsep(self, node):
         pass
 
@@ -510,7 +523,13 @@ class BehatTranslator(nodes.NodeVisitor):
     def visit_target(self, node):
         pass
 
+    def depart_target(self, node):
+        pass
+
     def visit_index(self, node):
+        pass
+
+    def depart_index(self, node):
         pass
 
     def visit_toctree(self, node):
